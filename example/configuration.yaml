@@ -1,0 +1,14 @@
+# Example configuration.yaml entry
+sensor:
+  - platform: netznoe
+    username: !secret netznoe_username
+    password: !secret netznoe_password
+    device_id: !secret netznoe_zaehlpunkt_1
+  - platform: netznoe
+    username: !secret netznoe_username
+    password: !secret netznoe_password
+    device_id: !secret netznoe_zaehlpunkt_2
+  - platform: netznoe
+    username: !secret netznoe_username
+    password: !secret netznoe_password
+    device_id: !secret netznoe_zaehlpunkt_3

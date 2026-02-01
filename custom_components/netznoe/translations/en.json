@@ -1,0 +1,21 @@
+{
+  "config": {
+    "error": {
+      "auth": "Username/password invalid",
+      "connection_error": "Unable to connect to Netz NO",
+      "no_smartmeter": "No smart meter found for this account",
+      "not_active": "Smart meter is not active"
+    },
+    "flow_title": "Netz NO Smartmeter",
+    "step": {
+      "user": {
+        "title": "Netz NO Smartmeter Authentication",
+        "description": "Enter your Netz NO Smartmeter portal credentials (smartmeter.netz-noe.at)",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    }
+  }
+}
