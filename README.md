@@ -1,7 +1,4 @@
 # NetzNÖ Smartmeter Integration for Home Assistant
-[![codecov](https://codecov.io/github/TobiKr/hass-NetzNOESmartMeter/graph/badge.svg?token=8MIZ7J5DWE)](https://codecov.io/github/TobiKr/hass-NetzNOESmartMeter)
-![Tests](https://github.com/TobiKr/hass-NetzNOESmartMeter/actions/workflows/test.yml/badge.svg)
-
 ![Hassfest](https://github.com/TobiKr/hass-NetzNOESmartMeter/actions/workflows/hassfest.yml/badge.svg)
 ![Validate](https://github.com/TobiKr/hass-NetzNOESmartMeter/actions/workflows/validate.yml/badge.svg)
 ![Release](https://github.com/TobiKr/hass-NetzNOESmartMeter/actions/workflows/release.yml/badge.svg)
