@@ -1,6 +1,7 @@
 node_modules/
 **/__pycache__
 venv/
+.claude/
 .idea/
 .coverage
 .pytest_cache
