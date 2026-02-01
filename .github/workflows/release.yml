@@ -4,6 +4,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   release_zip_file:
     name: Prepare release asset
@@ -30,7 +33,7 @@ jobs:
           cd ${{ github.workspace }}/custom_components/netznoe
           zip netznoe.zip -r ./
       - name: Upload zip to release
-        uses: svenstaro/upload-release-action@v1-release
+        uses: svenstaro/upload-release-action@v2-release
 
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
