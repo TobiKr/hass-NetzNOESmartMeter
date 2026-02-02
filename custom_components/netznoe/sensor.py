@@ -13,8 +13,8 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from .const import CONF_METERING_POINTS, DOMAIN
 from .netznoe_sensor import NetzNoeSensor
 
-# Time between updating data from Netz NO (every 6 hours)
-SCAN_INTERVAL = timedelta(hours=6)
+# Time between updating data from Netz NO (every hour)
+SCAN_INTERVAL = timedelta(hours=1)
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
