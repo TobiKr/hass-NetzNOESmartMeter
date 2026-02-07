@@ -43,7 +43,7 @@ async def async_setup_entry(
         )
         for mp in config.get(CONF_METERING_POINTS, [])
     ]
-    async_add_entities(sensors, update_before_add=True)
+    async_add_entities(sensors, update_before_add=False)
 
 
 async def async_setup_platform(
@@ -56,4 +56,4 @@ async def async_setup_platform(
     sensor = NetzNoeSensor(
         config[CONF_USERNAME], config[CONF_PASSWORD], config[CONF_DEVICE_ID]
     )
-    async_add_entities([sensor], update_before_add=True)
+    async_add_entities([sensor], update_before_add=False)

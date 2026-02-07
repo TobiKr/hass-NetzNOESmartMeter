@@ -1,4 +1,5 @@
 """Netz NO Smartmeter sensor entity."""
+import asyncio
 import logging
 from datetime import datetime
 from typing import Any, Optional
@@ -54,6 +55,7 @@ class NetzNoeSensor(SensorEntity):
 
         self._available: bool = True
         self._last_update: Optional[str] = None
+        self._import_task: asyncio.Task | None = None
 
     @property
     def get_state(self) -> Optional[str]:
@@ -85,8 +87,34 @@ class NetzNoeSensor(SensorEntity):
         attrs["last_update"] = self._last_update
         return attrs
 
+    async def async_added_to_hass(self) -> None:
+        """Run when entity is added to hass."""
+        self._import_task = self.hass.async_create_task(
+            self._async_background_update()
+        )
+
+    async def _async_background_update(self) -> None:
+        """Perform the first update as a background task."""
+        try:
+            await self._async_do_update()
+        except Exception as e:
+            _LOGGER.exception("Error during background update: %s", e)
+        finally:
+            self._import_task = None
+            self.async_write_ha_state()
+
     async def async_update(self) -> None:
-        """Update sensor state."""
+        """Update sensor state (called by HA polling)."""
+        if self._import_task is not None:
+            _LOGGER.debug(
+                "Import still in progress for %s, skipping periodic update",
+                self.metering_point_id,
+            )
+            return
+        await self._async_do_update()
+
+    async def _async_do_update(self) -> None:
+        """Perform the actual sensor update."""
         try:
             smartmeter = Smartmeter(username=self.username, password=self.password)
             async_smartmeter = AsyncSmartmeter(self.hass, smartmeter)
