@@ -19,6 +19,7 @@ ATTRS_ACCOUNT_INFO = [
 # From /User/GetMeteringPointByAccountId response
 ATTRS_METERING_POINT = [
     ("meteringPointId", "meteringPointId"),
+    ("hasFtmMeterData", "hasFtmMeterData"),
 ]
 
 # From /ConsumptionRecord/Day response

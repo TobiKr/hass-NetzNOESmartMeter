@@ -1,4 +1,5 @@
 """Historical data importer for Netz NO Smartmeter."""
+import calendar
 import logging
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
@@ -30,6 +31,7 @@ class Importer:
         async_smartmeter: AsyncSmartmeter,
         metering_point_id: str,
         unit_of_measurement: str,
+        has_ftm_meter_data: bool = True,
     ):
         """Initialize the importer.
 
@@ -38,12 +40,14 @@ class Importer:
             async_smartmeter: Async smartmeter client
             metering_point_id: Metering point ID
             unit_of_measurement: Unit of measurement for statistics
+            has_ftm_meter_data: True for 15-min interval meters, False for daily meters
         """
         self.id = f"{DOMAIN}:{metering_point_id.lower()}"
         self.metering_point_id = metering_point_id
         self.unit_of_measurement = unit_of_measurement
         self.hass = hass
         self.async_smartmeter = async_smartmeter
+        self.has_ftm_meter_data = has_ftm_meter_data
 
     def is_last_inserted_stat_valid(self, last_inserted_stat: dict) -> bool:
         """Check if last inserted statistics are valid."""
@@ -164,9 +168,7 @@ class Importer:
     ) -> Decimal:
         """Import statistics from Netz NO API.
 
-        The Netz NO API provides daily consumption via the Day endpoint.
-        Each day returns individual readings (e.g., 96 values for 15-min intervals).
-        We aggregate to hourly statistics (HA requires timestamps at top of hour).
+        Dispatches to the appropriate import method based on meter type.
         """
         now = datetime.now(timezone.utc)
 
@@ -179,12 +181,29 @@ class Importer:
         if start.tzinfo is None:
             raise ValueError("start datetime must be timezone-aware!")
 
-        _LOGGER.debug("Importing data from %s to %s", start, end)
+        _LOGGER.debug(
+            "Importing data from %s to %s (FTM: %s)", start, end, self.has_ftm_meter_data
+        )
         if start > end:
             _LOGGER.warning("Start date is after end date, skipping")
             return total_usage
 
-        # Store hourly consumption (HA requires timestamps at top of hour)
+        if self.has_ftm_meter_data:
+            return await self._import_ftm_statistics(start, end, total_usage)
+        else:
+            return await self._import_daily_statistics(start, end, total_usage)
+
+    async def _import_ftm_statistics(
+        self,
+        start: datetime,
+        end: datetime,
+        total_usage: Decimal,
+    ) -> Decimal:
+        """Import FTM (15-minute interval) statistics.
+
+        Each day returns individual readings (e.g., 96 values for 15-min intervals).
+        We aggregate to hourly statistics (HA requires timestamps at top of hour).
+        """
         hourly_readings = defaultdict(Decimal)
         current_date = start.date()
         end_date = end.date()
@@ -230,7 +249,83 @@ class Importer:
 
         if statistics:
             _LOGGER.debug(
-                "Importing %d statistics entries from %s to %s",
+                "Importing %d FTM statistics entries from %s to %s",
+                len(statistics),
+                statistics[0]["start"],
+                statistics[-1]["start"],
+            )
+            async_add_external_statistics(self.hass, metadata, statistics)
+
+        return total_usage
+
+    async def _import_daily_statistics(
+        self,
+        start: datetime,
+        end: datetime,
+        total_usage: Decimal,
+    ) -> Decimal:
+        """Import daily meter statistics using the Month endpoint.
+
+        Each day's single consumption value becomes one statistics entry
+        assigned to midnight UTC of that day.
+        """
+        daily_readings: dict[datetime, Decimal] = {}
+        start_date = start.date()
+        end_date = end.date()
+
+        # Iterate month by month
+        current_year = start_date.year
+        current_month = start_date.month
+
+        while date(current_year, current_month, 1) <= end_date:
+            try:
+                times, values = await self.async_smartmeter.get_consumption_month(
+                    current_year, current_month, self.metering_point_id
+                )
+
+                if values:
+                    days_in_month = calendar.monthrange(current_year, current_month)[1]
+                    for day_index, value in enumerate(values):
+                        if value is None:
+                            continue
+                        day_num = day_index + 1  # 1-based day of month
+                        if day_num > days_in_month:
+                            break
+                        day_date = date(current_year, current_month, day_num)
+                        # Skip days outside our requested range
+                        if day_date < start_date or day_date > end_date:
+                            continue
+                        day_midnight = datetime.combine(
+                            day_date, datetime.min.time(), tzinfo=timezone.utc
+                        )
+                        daily_readings[day_midnight] = Decimal(str(value))
+
+            except Exception as e:
+                _LOGGER.debug(
+                    "Could not fetch monthly data for %d-%02d: %s",
+                    current_year, current_month, e
+                )
+
+            # Advance to next month
+            if current_month == 12:
+                current_year += 1
+                current_month = 1
+            else:
+                current_month += 1
+
+        # Build statistics with daily resolution
+        statistics = []
+        metadata = self.get_statistics_metadata()
+
+        for ts, usage in sorted(daily_readings.items(), key=itemgetter(0)):
+            total_usage += usage
+            statistics.append(
+                StatisticData(start=ts, sum=float(total_usage), state=float(usage))
+            )
+
+        if statistics:
+            _LOGGER.debug(
+                "Importing %d daily statistics entries from %s to %s",
                 len(statistics),
                 statistics[0]["start"],
                 statistics[-1]["start"],

@@ -40,6 +40,7 @@ async def async_setup_entry(
             config[CONF_PASSWORD],
             mp["meteringPointId"],
             account_info,
+            has_ftm_meter_data=mp.get("hasFtmMeterData", True),
         )
         for mp in config.get(CONF_METERING_POINTS, [])
     ]

@@ -70,26 +70,42 @@ class AsyncSmartmeter:
         )
 
     async def get_latest_meter_reading(
-        self, meter_id: Optional[str] = None
+        self, meter_id: Optional[str] = None, has_ftm_meter_data: bool = True
     ) -> Optional[float]:
         """Get the latest meter reading.
 
-        Tries yesterday first, then day before yesterday.
-        Returns consumption sum in kWh.
+        For FTM meters: tries yesterday first, then day before yesterday.
+        For daily meters: fetches current month and returns last non-null value.
+        Returns consumption in kWh.
         """
-        for days_ago in [1, 2]:
+        if has_ftm_meter_data:
+            for days_ago in [1, 2]:
+                try:
+                    day = before(today(), days_ago).date()
+                    _LOGGER.debug("Fetching consumption for day: %s, meter: %s", day, meter_id)
+                    times, values = await self.get_consumption_day(day, meter_id)
+                    _LOGGER.debug("Consumption response - times: %s, values: %s", times, values)
+                    if values:
+                        # Sum all metered values for the day (values are already in kWh)
+                        total = sum(v for v in values if v is not None)
+                        _LOGGER.debug("Daily total (kWh): %s", total)
+                        return total
+                except Exception as e:
+                    _LOGGER.warning("Could not get reading for %s days ago: %s", days_ago, e)
+        else:
+            # Daily meter: fetch current month and return last non-null value
+            today_date = date.today()
             try:
-                day = before(today(), days_ago).date()
-                _LOGGER.debug("Fetching consumption for day: %s, meter: %s", day, meter_id)
-                times, values = await self.get_consumption_day(day, meter_id)
-                _LOGGER.debug("Consumption response - times: %s, values: %s", times, values)
+                times, values = await self.get_consumption_month(
+                    today_date.year, today_date.month, meter_id
+                )
                 if values:
-                    # Sum all metered values for the day (values are already in kWh)
-                    total = sum(v for v in values if v is not None)
-                    _LOGGER.debug("Daily total (kWh): %s", total)
-                    return total
+                    for v in reversed(values):
+                        if v is not None:
+                            _LOGGER.debug("Latest daily reading (kWh): %s", v)
+                            return v
             except Exception as e:
-                _LOGGER.warning("Could not get reading for %s days ago: %s", days_ago, e)
+                _LOGGER.warning("Could not get monthly reading: %s", e)
         return None
 
     @staticmethod

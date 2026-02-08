@@ -29,6 +29,7 @@ class NetzNoeSensor(SensorEntity):
         password: str,
         metering_point_id: str,
         account_info: Optional[dict] = None,
+        has_ftm_meter_data: bool = True,
     ) -> None:
         """Initialize the sensor.
 
@@ -37,12 +38,14 @@ class NetzNoeSensor(SensorEntity):
             password: Netz NO password
             metering_point_id: The metering point ID
             account_info: Optional account information
+            has_ftm_meter_data: True for 15-min interval meters, False for daily meters
         """
         super().__init__()
         self.username = username
         self.password = password
         self.metering_point_id = metering_point_id
         self.account_info = account_info or {}
+        self.has_ftm_meter_data = has_ftm_meter_data
 
         # Sensor attributes
         self._attr_native_value: float | None = None
@@ -85,6 +88,7 @@ class NetzNoeSensor(SensorEntity):
         attrs = self._attr_extra_state_attributes.copy()
         attrs["metering_point_id"] = self.metering_point_id
         attrs["last_update"] = self._last_update
+        attrs["has_ftm_meter_data"] = self.has_ftm_meter_data
         return attrs
 
     async def async_added_to_hass(self) -> None:
@@ -137,6 +141,7 @@ class NetzNoeSensor(SensorEntity):
                     async_smartmeter,
                     self.metering_point_id,
                     self.unit_of_measurement,
+                    has_ftm_meter_data=self.has_ftm_meter_data,
                 )
                 cumulative_total = await importer.async_import()
 

@@ -217,9 +217,11 @@ class Smartmeter:
         )
         logger.debug("ConsumptionDay raw response: %s", response)
 
-        # API returns a list containing a dictionary - extract first element
+        # API may return multiple entries for energy community users.
+        # We want the entry with ec_id == null (the base meter, not community allocations).
         if isinstance(response, list) and len(response) > 0:
-            response = response[0]
+            base_entries = [r for r in response if r.get("ec_id") is None]
+            response = base_entries[0] if base_entries else response[0]
         elif isinstance(response, list):
             return ([], [])
 
@@ -250,9 +252,11 @@ class Smartmeter:
             query={"meterId": meter_id, "year": year, "month": month},
         )
 
-        # API returns a list containing a dictionary - extract first element
+        # API may return multiple entries for energy community users.
+        # We want the entry with ec_id == null (the base meter, not community allocations).
         if isinstance(response, list) and len(response) > 0:
-            response = response[0]
+            base_entries = [r for r in response if r.get("ec_id") is None]
+            response = base_entries[0] if base_entries else response[0]
         elif isinstance(response, list):
             return ([], [])
 
