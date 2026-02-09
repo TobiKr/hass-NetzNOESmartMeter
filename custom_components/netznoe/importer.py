@@ -230,6 +230,9 @@ class Importer:
                             reading_time = day_start + timedelta(minutes=i * interval_minutes)
                             # Round down to the start of the hour
                             hour_start = reading_time.replace(minute=0, second=0, microsecond=0)
+                            # Skip hours already imported (start = end of last stat)
+                            if hour_start < start:
+                                continue
                             hourly_readings[hour_start] += Decimal(str(value))
 
             except Exception as e:
@@ -292,8 +295,12 @@ class Importer:
                         if day_num > days_in_month:
                             break
                         day_date = date(current_year, current_month, day_num)
-                        # Skip days outside our requested range
-                        if day_date < start_date or day_date > end_date:
+                        # Skip days outside our requested range.
+                        # Use <= for start_date because incremental imports set start
+                        # to the END of the last stat (midnight + 1hr), so start_date
+                        # equals the last already-imported day — skip it to avoid
+                        # re-adding its value to the cumulative sum.
+                        if day_date <= start_date or day_date > end_date:
                             continue
                         day_midnight = datetime.combine(
                             day_date, datetime.min.time(), tzinfo=timezone.utc
