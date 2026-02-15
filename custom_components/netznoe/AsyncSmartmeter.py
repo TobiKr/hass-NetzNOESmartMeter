@@ -1,15 +1,13 @@
 """Async wrapper for Netz NO Smartmeter API."""
 import asyncio
 import logging
-from asyncio import Future
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from homeassistant.core import HomeAssistant
 
 from .api import Smartmeter
-from .const import ATTRS_ACCOUNT_INFO, ATTRS_METERING_POINT
-from .utils import translate_dict, before, today
+from .utils import before, today
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,22 +26,15 @@ class AsyncSmartmeter:
         self.smartmeter = smartmeter
         self.login_lock = asyncio.Lock()
 
-    async def login(self) -> Future:
+    async def login(self) -> None:
         """Async login to Netz NO API."""
         async with self.login_lock:
-            return await self.hass.async_add_executor_job(self.smartmeter.login)
+            await self.hass.async_add_executor_job(self.smartmeter.login)
 
-    async def get_account_info(self) -> Dict[str, Any]:
-        """Get account information asynchronously."""
-        info = await self.hass.async_add_executor_job(self.smartmeter.get_account_info)
-        return translate_dict(info, ATTRS_ACCOUNT_INFO)
-
-    async def get_metering_points(self) -> List[Dict[str, Any]]:
-        """Get all metering points asynchronously."""
-        points = await self.hass.async_add_executor_job(
-            self.smartmeter.get_metering_points
-        )
-        return [translate_dict(p, ATTRS_METERING_POINT) for p in points]
+    async def ensure_logged_in(self) -> None:
+        """Ensure the client is logged in, re-authenticating if needed."""
+        if not self.smartmeter.is_logged_in():
+            await self.login()
 
     async def get_consumption_day(
         self, day: date, meter_id: Optional[str] = None
@@ -107,10 +98,3 @@ class AsyncSmartmeter:
             except Exception as e:
                 _LOGGER.warning("Could not get monthly reading: %s", e)
         return None
-
-    @staticmethod
-    def is_active(account_info: Dict[str, Any]) -> bool:
-        """Check if the smart meter is active based on account info."""
-        return account_info.get("hasActive", False) and account_info.get(
-            "hasSmartMeter", False
-        )

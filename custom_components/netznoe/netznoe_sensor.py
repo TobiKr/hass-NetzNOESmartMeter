@@ -5,16 +5,15 @@ from datetime import datetime
 from typing import Any, Optional
 
 from homeassistant.components.sensor import (
-    ENTITY_ID_FORMAT,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
 from homeassistant.const import UnitOfEnergy
-from homeassistant.util import slugify
+from homeassistant.helpers.entity import DeviceInfo
 
 from .AsyncSmartmeter import AsyncSmartmeter
-from .api import Smartmeter
+from .const import DOMAIN, is_meter_active
 from .importer import Importer
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,32 +24,26 @@ class NetzNoeSensor(SensorEntity):
 
     def __init__(
         self,
-        username: str,
-        password: str,
-        metering_point_id: str,
-        account_info: Optional[dict] = None,
-        has_ftm_meter_data: bool = True,
+        async_smartmeter: AsyncSmartmeter,
+        metering_point_data: dict,
     ) -> None:
         """Initialize the sensor.
 
         Args:
-            username: Netz NO username
-            password: Netz NO password
-            metering_point_id: The metering point ID
-            account_info: Optional account information
-            has_ftm_meter_data: True for 15-min interval meters, False for daily meters
+            async_smartmeter: Shared async smartmeter client
+            metering_point_data: Full metering point dict from the API
         """
         super().__init__()
-        self.username = username
-        self.password = password
-        self.metering_point_id = metering_point_id
-        self.account_info = account_info or {}
-        self.has_ftm_meter_data = has_ftm_meter_data
+        self.async_smartmeter = async_smartmeter
+        self.metering_point_id: str = metering_point_data["meteringPointId"]
+        self.has_ftm_meter_data: bool = metering_point_data.get("hasFtmMeterData", True)
+        self._is_meter_active: bool = is_meter_active(metering_point_data)
+        self._smart_meter_type: Optional[str] = metering_point_data.get("smartMeterType")
 
         # Sensor attributes
         self._attr_native_value: float | None = None
         self._attr_extra_state_attributes = {}
-        self._attr_name = f"Smartmeter {metering_point_id}"
+        self._attr_name = f"Smartmeter {self.metering_point_id}"
         self._attr_icon = "mdi:flash"
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
         self._attr_device_class = SensorDeviceClass.ENERGY
@@ -61,18 +54,6 @@ class NetzNoeSensor(SensorEntity):
         self._import_task: asyncio.Task | None = None
 
     @property
-    def get_state(self) -> Optional[str]:
-        """Return formatted state value."""
-        if self._attr_native_value is not None:
-            return f"{self._attr_native_value:.3f}"
-        return None
-
-    @property
-    def _id(self):
-        """Return entity ID."""
-        return ENTITY_ID_FORMAT.format(slugify(self._attr_name).lower())
-
-    @property
     def unique_id(self) -> str:
         """Return unique ID for the sensor."""
         return f"netznoe_{self.metering_point_id}"
@@ -81,6 +62,16 @@ class NetzNoeSensor(SensorEntity):
     def available(self) -> bool:
         """Return True if entity is available."""
         return self._available
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info for this metering point."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.metering_point_id)},
+            name=f"Smartmeter {self.metering_point_id}",
+            manufacturer="Netz Niederösterreich",
+            model=self._smart_meter_type or "Smartmeter",
+        )
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -120,39 +111,33 @@ class NetzNoeSensor(SensorEntity):
     async def _async_do_update(self) -> None:
         """Perform the actual sensor update."""
         try:
-            smartmeter = Smartmeter(username=self.username, password=self.password)
-            async_smartmeter = AsyncSmartmeter(self.hass, smartmeter)
+            # Ensure shared client is logged in (handles session expiry)
+            await self.async_smartmeter.ensure_logged_in()
+            _LOGGER.debug("Login ensured for %s", self.metering_point_id)
 
-            await async_smartmeter.login()
-            _LOGGER.debug("Login successful for %s", self.metering_point_id)
-
-            # Get account info
-            account_info = await async_smartmeter.get_account_info()
-            _LOGGER.debug("Account info: %s", account_info)
-            self._attr_extra_state_attributes = account_info
-
-            is_active = async_smartmeter.is_active(account_info)
-            _LOGGER.debug("is_active: %s", is_active)
-
-            if is_active:
-                # Import historical data for energy dashboard
-                importer = Importer(
-                    self.hass,
-                    async_smartmeter,
+            if not self._is_meter_active:
+                _LOGGER.warning(
+                    "Smartmeter %s is not active, skipping data fetch",
                     self.metering_point_id,
-                    self.unit_of_measurement,
-                    has_ftm_meter_data=self.has_ftm_meter_data,
                 )
-                cumulative_total = await importer.async_import()
+                return
 
-                # Use cumulative total from importer for sensor state
-                if cumulative_total is not None:
-                    _LOGGER.debug("Cumulative total from importer: %s", cumulative_total)
-                    self._attr_native_value = float(cumulative_total)
-                else:
-                    _LOGGER.debug("No cumulative total available")
+            # Import historical data for energy dashboard
+            importer = Importer(
+                self.hass,
+                self.async_smartmeter,
+                self.metering_point_id,
+                self.unit_of_measurement,
+                has_ftm_meter_data=self.has_ftm_meter_data,
+            )
+            cumulative_total = await importer.async_import()
+
+            # Use cumulative total from importer for sensor state
+            if cumulative_total is not None:
+                _LOGGER.debug("Cumulative total from importer: %s", cumulative_total)
+                self._attr_native_value = float(cumulative_total)
             else:
-                _LOGGER.warning("Smartmeter %s is not active, skipping data fetch", self.metering_point_id)
+                _LOGGER.debug("No cumulative total available")
 
             self._available = True
             self._last_update = datetime.now().strftime("%d.%m.%Y %H:%M:%S")

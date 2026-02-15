@@ -109,14 +109,6 @@ class Importer:
         _LOGGER.debug("Last inserted stat: %s", last_inserted_stat)
 
         try:
-            account_info = await self.async_smartmeter.get_account_info()
-
-            if not self.async_smartmeter.is_active(account_info):
-                _LOGGER.debug(
-                    "Smartmeter %s is not active", self.metering_point_id
-                )
-                return None
-
             if not self.is_last_inserted_stat_valid(last_inserted_stat):
                 # Initial import - last 3 years
                 _LOGGER.warning(
@@ -254,8 +246,8 @@ class Importer:
             _LOGGER.debug(
                 "Importing %d FTM statistics entries from %s to %s",
                 len(statistics),
-                statistics[0]["start"],
-                statistics[-1]["start"],
+                statistics[0].start,
+                statistics[-1].start,
             )
             async_add_external_statistics(self.hass, metadata, statistics)
 
@@ -334,8 +326,8 @@ class Importer:
             _LOGGER.debug(
                 "Importing %d daily statistics entries from %s to %s",
                 len(statistics),
-                statistics[0]["start"],
-                statistics[-1]["start"],
+                statistics[0].start,
+                statistics[-1].start,
             )
             async_add_external_statistics(self.hass, metadata, statistics)
 
