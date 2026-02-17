@@ -246,8 +246,8 @@ class Importer:
             _LOGGER.debug(
                 "Importing %d FTM statistics entries from %s to %s",
                 len(statistics),
-                statistics[0].start,
-                statistics[-1].start,
+                statistics[0]["start"],
+                statistics[-1]["start"],
             )
             async_add_external_statistics(self.hass, metadata, statistics)
 
@@ -326,8 +326,8 @@ class Importer:
             _LOGGER.debug(
                 "Importing %d daily statistics entries from %s to %s",
                 len(statistics),
-                statistics[0].start,
-                statistics[-1].start,
+                statistics[0]["start"],
+                statistics[-1]["start"],
             )
             async_add_external_statistics(self.hass, metadata, statistics)
 
