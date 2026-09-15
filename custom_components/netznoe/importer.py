@@ -8,13 +8,18 @@ from operator import itemgetter
 from typing import Optional
 
 from homeassistant.components.recorder import get_instance
-from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
+from homeassistant.components.recorder.models import (
+    StatisticData,
+    StatisticMeanType,
+    StatisticMetaData,
+)
 from homeassistant.components.recorder.statistics import (
     async_add_external_statistics,
     get_last_statistics,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import EnergyConverter
 
 from .AsyncSmartmeter import AsyncSmartmeter
 from .const import DOMAIN
@@ -138,7 +143,8 @@ class Importer:
             statistic_id=self.id,
             name=f"Netz NO {self.metering_point_id}",
             unit_of_measurement=self.unit_of_measurement,
-            has_mean=False,
+            mean_type=StatisticMeanType.NONE,
+            unit_class=EnergyConverter.UNIT_CLASS,
             has_sum=True,
         )
 
