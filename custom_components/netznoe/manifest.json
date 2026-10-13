@@ -9,8 +9,6 @@
     "documentation": "https://github.com/TobiKr/hass-NetzNOESmartMeter",
     "iot_class": "cloud_polling",
     "issue_tracker": "https://github.com/TobiKr/hass-NetzNOESmartMeter/issues",
-    "requirements": [
-        "requests"
-    ],
-    "version": "0.7.2"
+    "requirements": [],
+    "version": "0.7.3"
 }
