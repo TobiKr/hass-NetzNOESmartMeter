@@ -10,5 +10,5 @@
     "iot_class": "cloud_polling",
     "issue_tracker": "https://github.com/TobiKr/hass-NetzNOESmartMeter/issues",
     "requirements": [],
-    "version": "0.7.3"
+    "version": "0.8.0"
 }
