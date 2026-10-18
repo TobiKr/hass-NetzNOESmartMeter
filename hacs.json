@@ -3,5 +3,6 @@
   "render_readme": true,
   "zip_release": true,
   "filename": "netznoe.zip",
-  "country": "AT"
+  "country": "AT",
+  "homeassistant": "2025.11.0"
 }

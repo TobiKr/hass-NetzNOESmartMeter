@@ -42,6 +42,16 @@ After successful configuration you can add sensors to your favourite dashboard, 
 ### Manual
 See [Example configuration files](example/configuration.yaml)
 
+### Options
+After setup, the following options can be changed via Settings > Devices & Services > NetzNÖ Smartmeter > Configure:
+
+- **Import estimated values** (default: off): Netz NÖ sometimes only provides estimated values (quality L3) for a day. By default these are skipped, leaving a gap until measured values are available. When enabled, the estimates are imported instead and replaced once measured values arrive within the re-import window.
+- **Days to re-import** (default: 7): On every update, this many past days are fetched again and rewritten. This fills gaps from values that arrived late and picks up corrections. Set to 0 to only import data newer than the last imported value.
+
+## Requirements
+
+Home Assistant 2025.11 or newer.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

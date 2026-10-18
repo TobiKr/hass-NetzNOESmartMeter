@@ -17,5 +17,20 @@
         }
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Import options",
+        "data": {
+          "import_estimated_values": "Import estimated values",
+          "reimport_days": "Days to re-import"
+        },
+        "data_description": {
+          "import_estimated_values": "Use the values Netz NÖ estimated (quality L3) for periods without a measured value yet. They are replaced automatically once measured values arrive within the re-import window.",
+          "reimport_days": "Number of past days that are fetched again and rewritten on every update, so late, corrected or newly measured values are picked up. 0 only imports data newer than the last imported value."
+        }
+      }
+    }
   }
 }

@@ -7,6 +7,7 @@ from typing import List, Optional, Tuple
 from homeassistant.core import HomeAssistant
 
 from .api import Smartmeter
+from .api.client import ConsumptionData
 from .utils import before, today
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,12 +45,28 @@ class AsyncSmartmeter:
             self.smartmeter.get_consumption_day, day, meter_id
         )
 
+    async def get_consumption_day_detailed(
+        self, day: date, meter_id: Optional[str] = None
+    ) -> ConsumptionData:
+        """Get daily consumption data including estimates asynchronously."""
+        return await self.hass.async_add_executor_job(
+            self.smartmeter.get_consumption_day_detailed, day, meter_id
+        )
+
     async def get_consumption_month(
         self, year: int, month: int, meter_id: Optional[str] = None
     ) -> Tuple[List[str], List[float]]:
         """Get monthly consumption data asynchronously."""
         return await self.hass.async_add_executor_job(
             self.smartmeter.get_consumption_month, year, month, meter_id
+        )
+
+    async def get_consumption_month_detailed(
+        self, year: int, month: int, meter_id: Optional[str] = None
+    ) -> ConsumptionData:
+        """Get monthly consumption data including estimates asynchronously."""
+        return await self.hass.async_add_executor_job(
+            self.smartmeter.get_consumption_month_detailed, year, month, meter_id
         )
 
     async def get_consumption_year(

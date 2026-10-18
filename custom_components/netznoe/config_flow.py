@@ -6,15 +6,36 @@ import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import callback
 
 from .api import Smartmeter
 from .api.errors import SmartmeterConnectionError, SmartmeterLoginError
-from .const import CONF_METERING_POINTS, DOMAIN, is_meter_active
+from .const import (
+    CONF_IMPORT_ESTIMATED_VALUES,
+    CONF_METERING_POINTS,
+    CONF_REIMPORT_DAYS,
+    DEFAULT_IMPORT_ESTIMATED_VALUES,
+    DEFAULT_REIMPORT_DAYS,
+    DOMAIN,
+    MAX_REIMPORT_DAYS,
+    is_meter_active,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 AUTH_SCHEMA = vol.Schema(
     {vol.Required(CONF_USERNAME): cv.string, vol.Required(CONF_PASSWORD): cv.string}
+)
+
+OPTIONS_SCHEMA = vol.Schema(
+    {
+        vol.Required(
+            CONF_IMPORT_ESTIMATED_VALUES, default=DEFAULT_IMPORT_ESTIMATED_VALUES
+        ): bool,
+        vol.Required(CONF_REIMPORT_DAYS, default=DEFAULT_REIMPORT_DAYS): vol.All(
+            vol.Coerce(int), vol.Range(min=0, max=MAX_REIMPORT_DAYS)
+        ),
+    }
 )
 
 
@@ -23,6 +44,14 @@ class NetzNoeSmartmeterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 2
     data: Optional[dict[str, Any]] = None
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> "NetzNoeSmartmeterOptionsFlow":
+        """Get the options flow for this handler."""
+        return NetzNoeSmartmeterOptionsFlow()
 
     async def validate_auth(self, username: str, password: str) -> dict:
         """Validate credentials and return metering points.
@@ -82,4 +111,20 @@ class NetzNoeSmartmeterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user", data_schema=AUTH_SCHEMA, errors=errors
+        )
+
+
+class NetzNoeSmartmeterOptionsFlow(config_entries.OptionsFlow):
+    """Netz NO Smartmeter options flow."""
+
+    async def async_step_init(self, user_input: Optional[dict[str, Any]] = None):
+        """Manage the import options."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(
+                OPTIONS_SCHEMA, self.config_entry.options
+            ),
         )

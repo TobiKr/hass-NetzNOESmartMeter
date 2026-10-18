@@ -1,7 +1,7 @@
 """Netz NO Smartmeter API Client."""
 import logging
 from datetime import date, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 from urllib import parse
 
 import requests
@@ -14,6 +14,35 @@ from .errors import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class ConsumptionData(NamedTuple):
+    """Readings for one period, as reported by the API.
+
+    For each slot the API fills either the metered or the estimated value
+    (quality L3) and leaves the other one None.
+    """
+
+    times: List[str]
+    metered: List[Optional[float]]
+    estimated: List[Optional[float]]
+
+
+def _to_consumption_data(response: Any) -> ConsumptionData:
+    """Extract the base meter's readings from a consumption response."""
+    # API may return multiple entries for energy community users.
+    # We want the entry with ec_id == null (the base meter, not community allocations).
+    if isinstance(response, list) and len(response) > 0:
+        base_entries = [r for r in response if r.get("ec_id") is None]
+        response = base_entries[0] if base_entries else response[0]
+    elif isinstance(response, list):
+        return ConsumptionData([], [], [])
+
+    return ConsumptionData(
+        response.get("peakDemandTimes") or [],
+        response.get("meteredValues") or [],
+        response.get("estimatedValues") or [],
+    )
 
 
 class Smartmeter:
@@ -207,6 +236,21 @@ class Smartmeter:
         Returns:
             Tuple of (peak_demand_times, metered_values)
         """
+        data = self.get_consumption_day_detailed(day, meter_id)
+        return (data.times, data.metered)
+
+    def get_consumption_day_detailed(
+        self, day: date, meter_id: Optional[str] = None
+    ) -> ConsumptionData:
+        """Get daily consumption data including estimated values.
+
+        Args:
+            day: Date to get consumption for
+            meter_id: Metering point ID (uses default if None)
+
+        Returns:
+            Timestamps, metered values and estimated values of the day
+        """
         meter_id = meter_id or self._metering_point_id
         if not meter_id:
             raise SmartmeterQueryError("No metering point ID available")
@@ -217,18 +261,7 @@ class Smartmeter:
         )
         logger.debug("ConsumptionDay raw response: %s", response)
 
-        # API may return multiple entries for energy community users.
-        # We want the entry with ec_id == null (the base meter, not community allocations).
-        if isinstance(response, list) and len(response) > 0:
-            base_entries = [r for r in response if r.get("ec_id") is None]
-            response = base_entries[0] if base_entries else response[0]
-        elif isinstance(response, list):
-            return ([], [])
-
-        return (
-            response.get("peakDemandTimes", []),
-            response.get("meteredValues", []),
-        )
+        return _to_consumption_data(response)
 
     def get_consumption_month(
         self, year: int, month: int, meter_id: Optional[str] = None
@@ -243,6 +276,22 @@ class Smartmeter:
         Returns:
             Tuple of (peak_demand_times, metered_values)
         """
+        data = self.get_consumption_month_detailed(year, month, meter_id)
+        return (data.times, data.metered)
+
+    def get_consumption_month_detailed(
+        self, year: int, month: int, meter_id: Optional[str] = None
+    ) -> ConsumptionData:
+        """Get monthly consumption data including estimated values.
+
+        Args:
+            year: Year
+            month: Month (1-12)
+            meter_id: Metering point ID (uses default if None)
+
+        Returns:
+            Timestamps, metered values and estimated values of the month
+        """
         meter_id = meter_id or self._metering_point_id
         if not meter_id:
             raise SmartmeterQueryError("No metering point ID available")
@@ -252,18 +301,7 @@ class Smartmeter:
             query={"meterId": meter_id, "year": year, "month": month},
         )
 
-        # API may return multiple entries for energy community users.
-        # We want the entry with ec_id == null (the base meter, not community allocations).
-        if isinstance(response, list) and len(response) > 0:
-            base_entries = [r for r in response if r.get("ec_id") is None]
-            response = base_entries[0] if base_entries else response[0]
-        elif isinstance(response, list):
-            return ([], [])
-
-        return (
-            response.get("peakDemandTimes", []),
-            response.get("meteredValues", []),
-        )
+        return _to_consumption_data(response)
 
     def get_consumption_year(
         self, year: int, meter_id: Optional[str] = None

@@ -13,7 +13,12 @@ from homeassistant.const import UnitOfEnergy
 from homeassistant.helpers.entity import DeviceInfo
 
 from .AsyncSmartmeter import AsyncSmartmeter
-from .const import DOMAIN, is_meter_active
+from .const import (
+    DEFAULT_IMPORT_ESTIMATED_VALUES,
+    DEFAULT_REIMPORT_DAYS,
+    DOMAIN,
+    is_meter_active,
+)
 from .importer import Importer
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,12 +31,16 @@ class NetzNoeSensor(SensorEntity):
         self,
         async_smartmeter: AsyncSmartmeter,
         metering_point_data: dict,
+        import_estimated_values: bool = DEFAULT_IMPORT_ESTIMATED_VALUES,
+        reimport_days: int = DEFAULT_REIMPORT_DAYS,
     ) -> None:
         """Initialize the sensor.
 
         Args:
             async_smartmeter: Shared async smartmeter client
             metering_point_data: Full metering point dict from the API
+            import_estimated_values: Import estimates where no measured value exists
+            reimport_days: Number of past days to re-import on every update
         """
         super().__init__()
         self.async_smartmeter = async_smartmeter
@@ -39,6 +48,8 @@ class NetzNoeSensor(SensorEntity):
         self.has_ftm_meter_data: bool = metering_point_data.get("hasFtmMeterData", True)
         self._is_meter_active: bool = is_meter_active(metering_point_data)
         self._smart_meter_type: Optional[str] = metering_point_data.get("smartMeterType")
+        self._import_estimated_values = import_estimated_values
+        self._reimport_days = reimport_days
 
         # Sensor attributes
         self._attr_native_value: float | None = None
@@ -129,6 +140,8 @@ class NetzNoeSensor(SensorEntity):
                 self.metering_point_id,
                 self.unit_of_measurement,
                 has_ftm_meter_data=self.has_ftm_meter_data,
+                import_estimated_values=self._import_estimated_values,
+                reimport_days=self._reimport_days,
             )
             cumulative_total = await importer.async_import()
 
